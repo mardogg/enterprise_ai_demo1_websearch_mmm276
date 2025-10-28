@@ -32,7 +32,7 @@ import os
 from typing import Optional, Dict, Any
 
 # OpenAI's official Python library - handles HTTPS, auth, retries
-from openai import OpenAI, AuthenticationError, RateLimitError, APIError
+from openai import OpenAI, AuthenticationError, RateLimitError, APIError, BadRequestError
 
 # Load environment variables from .env file (keeps secrets out of code)
 from dotenv import load_dotenv
@@ -223,10 +223,37 @@ class WebSearchClient:
         try:
             # Make API request
             response = self.client.responses.create(**payload)
-            
+
             # Convert response to dictionary
             return self._response_to_dict(response)
-            
+
+        except BadRequestError as e:
+            # Handle models that don't support the 'filters' tool parameter by
+            # retrying the request without filters. This keeps behavior working
+            # across model differences while preserving domain filtering where
+            # possible.
+            msg = str(e)
+            if options.allowed_domains and ("filters" in msg or "Parameter 'filters' not supported" in msg):
+                # Remove filters and retry once
+                try:
+                    if "tools" in payload and payload["tools"]:
+                        payload["tools"][0].pop("filters", None)
+                    response = self.client.responses.create(**payload)
+                    return self._response_to_dict(response)
+                except Exception as e2:
+                    # Fall through to standard error handling below
+                    raise SearchError(
+                        code="API_ERROR",
+                        message=f"API request failed after retry without filters: {str(e2)}",
+                        details={"original_error": str(e2)}
+                    )
+            # If not a filters-related BadRequestError, raise as SearchError
+            raise SearchError(
+                code="API_ERROR",
+                message=f"API request failed: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
         except AuthenticationError as e:
             raise SearchError(
                 code="AUTHENTICATION_ERROR",

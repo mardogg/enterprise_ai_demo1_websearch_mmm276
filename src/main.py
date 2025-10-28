@@ -8,6 +8,8 @@ import os
 import sys
 import argparse
 from typing import List
+import textwrap
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -62,9 +64,24 @@ Examples:
     )
     
     parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["default", "techsupport", "study"],
+        default="default",
+        help="Choose specialized prompting behavior"
+    )
+    
+    parser.add_argument(
         "--domains",
         type=str,
         help="Comma-separated list of allowed domains (e.g., 'example.com,test.com')"
+    )
+
+    parser.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="Optional path to save formatted output (e.g., plan.md)"
     )
     
     parser.add_argument(
@@ -131,7 +148,7 @@ def main() -> int:
         args = parse_arguments()
         logger.debug(
             f"Parsed arguments: query='{args.query}', "
-            f"model={args.model}, domains={args.domains}"
+            f"model={args.model}, domains={args.domains}, mode={args.mode}, out={args.out}"
         )
         
         # Verbose logging
@@ -139,8 +156,11 @@ def main() -> int:
             # Verbose mode - logged but not tested in unit tests
             print(f"Using model: {args.model}")
             print(f"Query: {args.query}")
+            print(f"Mode: {args.mode}")
             if args.domains:
                 print(f"Domain filter: {args.domains}")
+            if args.out:
+                print(f"Output file: {args.out}")
             print()
         
         # Create search options
@@ -151,6 +171,16 @@ def main() -> int:
             domain_list = [d.strip() for d in args.domains.split(",")]
             options.allowed_domains = domain_list
             logger.info(f"Domain filtering enabled: {domain_list}")
+        # If no domains provided and techsupport mode, enable curated support domains
+        if not args.domains and args.mode == "techsupport":
+            options.allowed_domains = [
+                "support.microsoft.com","learn.microsoft.com",
+                "apple.com","support.apple.com",
+                "asus.com","support.lenovo.com",
+                "dell.com","hp.com","nvidia.com","amd.com"
+            ]
+            logger.info("Domain filtering enabled by mode=techsupport: "
+                        f"{options.allowed_domains}")
         
         # Get API key
         api_key = os.getenv("OPENAI_API_KEY")
@@ -162,18 +192,57 @@ def main() -> int:
         logger.debug("Initializing search service")
         service = SearchService(api_key=api_key)
         
+        # Build prompt according to mode
+        if args.mode == "techsupport":
+            prompt = textwrap.dedent(f"""
+            You are an expert PC/Mac repair technician. Create a concise, field-ready troubleshooting plan for the following customer issue.
+
+            Output exactly in this structure:
+            ## Quick Hypotheses
+            - (3–6 bullets of likely causes)
+
+            ## Diagnostics (Step-by-Step)
+            1. ...
+            2. ...
+            3. ...
+               - If success: ...
+               - If fails: ...
+
+            ## Safety & Data-Loss Warnings
+            - ...
+
+            ## Fix Paths
+            - ...
+
+            ## When to Escalate
+            - (criteria for parts order, depot send-out, vendor handoff, DRD L2/L3, etc.)
+
+            Customer issue: {args.query}
+            """).strip()
+        elif args.mode == "study":
+            prompt = args.query
+        else:
+            prompt = args.query
+
         # Perform search
         if args.verbose:
             print("Searching...\n")
-        
-        logger.info(f"Executing search query: '{args.query}'")
-        with LogContext(logger, "Web search", query=args.query, model=args.model):
-            result = service.search(args.query, options)
+
+        log_q = args.query if args.mode == "default" else f"[{args.mode}] {args.query}"
+        logger.info(f"Executing search query: '{log_q}'")
+        with LogContext(logger, "Web search", query=log_q, model=args.model):
+            result = service.search(prompt, options)
         
         logger.info(f"Search completed: {len(result.citations)} citations found")
         
         # Display results
         display_results(result)
+        
+        # Optionally save output
+        if args.out:
+            formatted = ResponseParser().format_for_display(result)
+            Path(args.out).write_text(formatted, encoding="utf-8")
+            print(f"\nSaved to: {Path(args.out).resolve()}")
         
         logger.info("Web search application completed successfully")
         return 0
