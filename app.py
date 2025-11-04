@@ -64,7 +64,7 @@ def make_service():
 service = make_service()
 
 # Handle a single user message and return updated chat history
-def handle_message(user_message, chat_history, temperature, max_results, model_name):
+def handle_message(user_message, chat_history, temperature, max_results, model_name, techsupport_mode):
     # chat_history is list of (user, assistant) tuples
     if chat_history is None:
         chat_history = []
@@ -82,8 +82,41 @@ def handle_message(user_message, chat_history, temperature, max_results, model_n
     reasoning = _map_temp_to_effort(float(temperature))
     options = SearchOptions(model=model_name or os.getenv("OPENAI_MODEL", "gpt-4o-mini"), reasoning_effort=reasoning)
 
+    # If techsupport_mode is enabled, wrap the user message in a detailed
+    # troubleshooting prompt so the assistant returns a full diagnostic
+    # summary (hypotheses, step-by-step diagnostics, safety warnings,
+    # fix paths, and escalation criteria).
+    if techsupport_mode:
+        prompt = textwrap.dedent(f"""
+        You are an expert PC/Mac repair technician. Create a concise, field-ready troubleshooting plan for the following customer issue.
+
+        Output exactly in this structure:
+        ## Quick Hypotheses
+        - (3–6 bullets of likely causes)
+
+        ## Diagnostics (Step-by-Step)
+        1. ...
+        2. ...
+        3. ...
+           - If success: ...
+           - If fails: ...
+
+        ## Safety & Data-Loss Warnings
+        - ...
+
+        ## Fix Paths
+        - ...
+
+        ## When to Escalate
+        - (criteria for parts order, depot send-out, vendor handoff, DRD L2/L3, etc.)
+
+        Customer issue: {user_message}
+        """).strip()
+    else:
+        prompt = user_message
+
     try:
-        result = service.search(user_message, options)
+        result = service.search(prompt, options)
         assistant_text = result.text
         # append citations limited by max_results
         assistant_text += _format_citations(result.citations, int(max_results))
@@ -135,12 +168,13 @@ def build_ui():
                 temp = gr.Slider(minimum=0.0, maximum=1.0, value=0.3, step=0.01, label="Temperature")
                 max_results = gr.Dropdown(choices=[1,2,3,4,5,10], value=5, label="Max sources to show")
                 model_name = gr.Textbox(label="Model", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+                techsupport_mode = gr.Checkbox(label="Tech support prompt", value=True)
                 gr.Markdown("---")
                 gr.Markdown("Built by Marwa Monsour", elem_classes="footer")
 
-        # event bindings
-        send_btn.click(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name], outputs=[chatbot, user_input])
-        user_input.submit(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name], outputs=[chatbot, user_input])
+    # event bindings
+    send_btn.click(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name, techsupport_mode], outputs=[chatbot, user_input])
+    user_input.submit(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name, techsupport_mode], outputs=[chatbot, user_input])
         clear_btn.click(lambda: ([], ""), None, [chatbot, user_input])
 
     return demo
@@ -148,7 +182,10 @@ def build_ui():
 
 def main():
     demo = build_ui()
-    demo.queue(concurrency_count=4)
+    # Use default queue configuration. Older/newer gradio versions may
+    # not accept the concurrency_count kwarg, so call without it for
+    # broader compatibility.
+    demo.queue()
     demo.launch(server_name="0.0.0.0", server_port=7860, show_error=True)
 
 
