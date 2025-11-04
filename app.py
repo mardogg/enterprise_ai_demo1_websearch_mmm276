@@ -65,18 +65,32 @@ service = make_service()
 
 # Handle a single user message and return updated chat history
 def handle_message(user_message, chat_history, temperature, max_results, model_name, techsupport_mode):
-    # chat_history is list of (user, assistant) tuples
+    # chat_history may be either a list of (user, assistant) tuples (old "tuples" format)
+    # or a list of dicts with {"role","content"} (Gradio 'messages' format).
+    # Normalize to messages format (list of dicts) which Chatbot(type='messages') expects.
     if chat_history is None:
         chat_history = []
 
-    # Append user message
-    chat_history.append((user_message, None))
+    msgs = []
+    # detect tuples format
+    if chat_history and isinstance(chat_history[0], tuple):
+        for u, a in chat_history:
+            msgs.append({"role": "user", "content": u})
+            if a is not None:
+                msgs.append({"role": "assistant", "content": a})
+    else:
+        # assume already messages format (list of dicts)
+        msgs = list(chat_history)
+
+    # Append the current user message as a 'user' role
+    msgs.append({"role": "user", "content": user_message})
 
     # If service not available, show friendly error
     if service is None:
         error_msg = "⚠️ Error: OpenAI API key not configured. Please set OPENAI_API_KEY in .env or pass it to the server."
-        chat_history[-1] = (user_message, error_msg)
-        return chat_history, ""
+        # replace last user message with assistant error reply in messages format
+        msgs.append({"role": "assistant", "content": error_msg})
+        return msgs, ""
 
     # Build options
     reasoning = _map_temp_to_effort(float(temperature))
@@ -121,33 +135,50 @@ def handle_message(user_message, chat_history, temperature, max_results, model_n
         # append citations limited by max_results
         assistant_text += _format_citations(result.citations, int(max_results))
 
-        # Replace the last tuple (user, None) with actual assistant response
-        chat_history[-1] = (user_message, assistant_text)
+        # Append assistant response to messages
+        msgs.append({"role": "assistant", "content": assistant_text})
 
     except SearchError as e:
-        chat_history[-1] = (user_message, f"⚠️ Error: {e.message}")
+        msgs.append({"role": "assistant", "content": f"⚠️ Error: {e.message}"})
     except Exception as e:
         tb = traceback.format_exc()
-        chat_history[-1] = (user_message, f"⚠️ Error: {str(e)}")
+        chat_history_repr = f"⚠️ Error: {str(e)}"
+        msgs.append({"role": "assistant", "content": chat_history_repr})
 
-    return chat_history, ""
+    return msgs, ""
 
 
 # UI build
 css = textwrap.dedent("""
-body { background: #0E1117; color: #FFFFFF; font-family: Inter, Poppins, sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+:root {
+    --bg: #071428; /* deep navy background */
+    --panel: #0b1724; /* dark slate panel */
+    --card: #0f2636; /* chat bubble background */
+    --user-bubble: #142534; /* user bubble */
+    --assistant-bubble: #0b1622; /* assistant bubble */
+    --primary: #0A84FF; /* electric blue accent */
+    --primary-600: #0C7BE6;
+    --muted: #9FB7D6; /* muted blue-gray text */
+    --text: #E6F0F8;
+}
+
+body { background: var(--bg); color: var(--text); font-family: Inter, Poppins, 'Segoe UI', Roboto, Arial, sans-serif; }
 .gradio-container { background: transparent; }
-.app-title { color: #00AEEF; font-weight: 700; }
-.app-sub { color: #FFFFFF; opacity: 0.85; }
-.footer { color: #39FF14; opacity: 0.9; margin-top: 12px; }
+.app-title { color: var(--primary); font-weight: 700; }
+.app-sub { color: var(--muted); opacity: 0.95; }
+.footer { color: var(--muted); opacity: 0.9; margin-top: 12px; }
 /* Chat bubbles */
-.gradio-chatbot .message { border-radius: 12px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
-.gradio-chatbot .message.user { background: #1F2937; color: #FFFFFF; align-self: flex-end; }
-.gradio-chatbot .message.bot { background: #111827; color: #FFFFFF; align-self: flex-start; }
+.gradio-chatbot .message { border-radius: 14px; padding: 14px; box-shadow: 0 8px 20px rgba(2,6,23,0.6); max-width: 88%; }
+.gradio-chatbot .message.user { background: var(--user-bubble); color: var(--text); align-self: flex-end; }
+.gradio-chatbot .message.bot { background: var(--assistant-bubble); color: var(--text); align-self: flex-start; }
+.gradio-chatbot { background: transparent; }
 /* Buttons */
-.gr-button { border-radius: 12px; background: linear-gradient(180deg, #00AEEF, #0095CC); }
+.gr-button { border-radius: 12px; background: linear-gradient(180deg, var(--primary), var(--primary-600)); color: white; box-shadow: 0 6px 18px rgba(10,132,255,0.12); }
 .gr-button:hover { background: #33CFFF; }
-.panel { border-radius: 12px; background: #0E1117; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
+.panel { border-radius: 12px; background: var(--panel); box-shadow: 0 10px 40px rgba(2,6,23,0.6); }
+.gradio-input textarea { background: #071a2a; color: var(--text); border-radius: 10px; }
+.gradio-container .gradio-row { gap: 12px; }
 """)
 
 
@@ -158,7 +189,7 @@ def build_ui():
 
         with gr.Row():
             with gr.Column(scale=3):
-                chatbot = gr.Chatbot(elem_id="chatbot", label="AI Assistant")
+                chatbot = gr.Chatbot(elem_id="chatbot", label="AI Assistant", type="messages")
                 user_input = gr.Textbox(placeholder="Describe the customer symptom...", show_label=False, lines=2)
                 with gr.Row():
                     send_btn = gr.Button("Send", variant="primary")
@@ -172,10 +203,10 @@ def build_ui():
                 gr.Markdown("---")
                 gr.Markdown("Built by Marwa Monsour", elem_classes="footer")
 
-    # event bindings
-    send_btn.click(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name, techsupport_mode], outputs=[chatbot, user_input])
-    user_input.submit(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name, techsupport_mode], outputs=[chatbot, user_input])
-        clear_btn.click(lambda: ([], ""), None, [chatbot, user_input])
+                # event bindings (must be inside the Blocks context)
+                send_btn.click(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name, techsupport_mode], outputs=[chatbot, user_input])
+                user_input.submit(fn=handle_message, inputs=[user_input, chatbot, temp, max_results, model_name, techsupport_mode], outputs=[chatbot, user_input])
+                clear_btn.click(lambda: ([], ""), None, [chatbot, user_input])
 
     return demo
 
@@ -186,7 +217,12 @@ def main():
     # not accept the concurrency_count kwarg, so call without it for
     # broader compatibility.
     demo.queue()
-    demo.launch(server_name="0.0.0.0", server_port=7860, show_error=True)
+    # Allow launching on a port set via env var GRADIO_SERVER_PORT for flexibility
+    try:
+        server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    except Exception:
+        server_port = 7860
+    demo.launch(server_name="0.0.0.0", server_port=server_port, show_error=True)
 
 
 if __name__ == "__main__":
