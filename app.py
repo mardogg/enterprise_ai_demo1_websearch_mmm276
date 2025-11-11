@@ -199,176 +199,199 @@ def handle_message(user_message, chat_history, temperature, max_results, model_n
 css = textwrap.dedent("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 :root {
-    --bg: #071428; /* deep navy background */
-    --panel: #0b1724; /* dark slate panel */
-    --card: #0f2636; /* chat bubble background */
-    --user-bubble: #142534; /* user bubble */
-    --assistant-bubble: #0b1622; /* assistant bubble */
-    --primary: #0A84FF; /* electric blue accent */
-    --primary-600: #0C7BE6;
-    --muted: #9FB7D6; /* muted blue-gray text */
-    --text: #E6F0F8;
+    --bg: #0b0f14; /* charcoal */
+    --panel: #111820; /* deep slate */
+    --card: #131e29; /* panel cards */
+    --accent: #14b8a6; /* teal */
+    --accent-600: #0ea5a3;
+    --muted: #9aa7b2; /* muted gray */
+    --text: #e8eef3;
+    --outline: rgba(255,255,255,0.06);
 }
 
 body { background: var(--bg); color: var(--text); font-family: Inter, Poppins, 'Segoe UI', Roboto, Arial, sans-serif; }
 .gradio-container { background: transparent; }
-.app-title { color: var(--primary); font-weight: 700; }
+.app-title { color: var(--text); font-weight: 700; letter-spacing: 0.2px; }
 .app-sub { color: var(--muted); opacity: 0.95; }
-.footer { color: var(--muted); opacity: 0.9; margin-top: 12px; }
-/* Chat bubbles */
-.gradio-chatbot .message { border-radius: 14px; padding: 14px; box-shadow: 0 8px 20px rgba(2,6,23,0.6); max-width: 88%; }
-.gradio-chatbot .message.user { background: var(--user-bubble); color: var(--text); align-self: flex-end; }
-.gradio-chatbot .message.bot { background: var(--assistant-bubble); color: var(--text); align-self: flex-start; }
-.gradio-chatbot { background: transparent; }
-/* Buttons */
-.gr-button { border-radius: 12px; background: linear-gradient(180deg, var(--primary), var(--primary-600)); color: white; box-shadow: 0 6px 18px rgba(10,132,255,0.12); }
-.gr-button:hover { background: #33CFFF; }
-.panel { border-radius: 12px; background: var(--panel); box-shadow: 0 10px 40px rgba(2,6,23,0.6); }
-.gradio-input textarea { background: #071a2a; color: var(--text); border-radius: 10px; }
-.gradio-container .gradio-row { gap: 12px; }
+.footer { color: var(--muted); opacity: 0.9; margin-top: 16px; }
+.panel { border-radius: 14px; background: var(--panel); border: 1px solid var(--outline); box-shadow: 0 10px 30px rgba(0,0,0,0.35); padding: 14px; }
+.card { border-radius: 14px; background: var(--card); border: 1px solid var(--outline); padding: 12px 14px; }
+.section-title { color: var(--accent); font-weight: 600; margin: 8px 0 6px; }
+.video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; border: 1px solid var(--outline); }
+.video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.gr-button { border-radius: 12px; background: linear-gradient(180deg, var(--accent), var(--accent-600)); color: white; box-shadow: 0 6px 18px rgba(20,184,166,0.18); border: none; }
+.gr-button:hover { filter: brightness(1.05); }
+.gradio-container .gradio-row { gap: 14px; }
 """)
 
 
 def build_ui():
     with gr.Blocks(css=css, theme="default") as demo:
-        gr.Markdown("<h1 class='app-title'>💡 AI Tech Assistant</h1>")
-        gr.Markdown("<p class='app-sub'>Troubleshoot devices with structured plans and auto YouTube help.</p>")
+        gr.Markdown("<h1 class='app-title'>AI Tech Assistant</h1>")
+        gr.Markdown("<p class='app-sub'>A cleaner workflow: enter your device and issue on the left. Your plan and tutorial appear on the right.</p>")
 
         with gr.Row():
+            # Left: Inputs
             with gr.Column(scale=2):
-                gr.Markdown("### Step 1 — Identify Device")
-                product_type = gr.Dropdown(
-                    label="Product Type", choices=[
-                        "Laptop/PC", "Smartphone", "Tablet", "Router/Modem", "Game Console", "Printer", "Smart TV", "Other"
-                    ], value=None, info="Required"
-                )
-                brand = gr.Textbox(label="Brand", placeholder="Dell, Apple, Netgear...", info="Required")
-                model = gr.Textbox(label="Model", placeholder="XPS 13, iPhone 12, R7000...", info="Required")
+                with gr.Group(elem_classes="panel"):
+                    gr.Markdown("<div class='section-title'>Step 1 — Identify Device</div>")
+                    product_type = gr.Dropdown(
+                        label="Product Type", choices=[
+                            "Laptop/PC", "Smartphone", "Tablet", "Router/Modem", "Game Console", "Printer", "Smart TV", "Other"
+                        ], value=None, info="Required"
+                    )
+                    brand = gr.Textbox(label="Brand", placeholder="Dell, Apple, Netgear...", info="Required")
+                    model = gr.Textbox(label="Model", placeholder="XPS 13, iPhone 12, R7000...", info="Required")
 
-                gr.Markdown("### Step 2 — Describe Issue")
-                issue_summary = gr.Textbox(label="Issue summary", placeholder="Short description (e.g., overheating, slow wifi)", info="Required")
-                details = gr.Textbox(label="Advanced details (optional)", lines=3, placeholder="Error messages, when it happens, what you've tried...")
+                with gr.Group(elem_classes="panel"):
+                    gr.Markdown("<div class='section-title'>Step 2 — Describe Issue</div>")
+                    issue_summary = gr.Textbox(label="Issue summary", placeholder="Overheating, won't boot, slow wifi...", info="Required")
+                    details = gr.Textbox(label="Advanced details (optional)", lines=3, placeholder="Error messages, when it happens, what you've tried...")
+                    with gr.Row():
+                        temp = gr.Slider(minimum=0.0, maximum=1.0, value=0.3, step=0.01, label="Temperature")
+                        model_name = gr.Textbox(label="Model (LLM)", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+                    generate_btn = gr.Button("Generate Plan", variant="primary")
 
-                with gr.Row():
-                    temp = gr.Slider(minimum=0.0, maximum=1.0, value=0.3, step=0.01, label="Temperature")
-                    model_name = gr.Textbox(label="Model (LLM)", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+            # Right: Outputs
+            with gr.Column(scale=3):
+                with gr.Group(elem_classes="panel"):
+                    gr.Markdown("<div class='section-title'>Plan</div>")
+                    with gr.Row():
+                        with gr.Column():
+                            obs_md = gr.Markdown(label="Observations", value="", elem_classes="card")
+                            hyp_md = gr.Markdown(label="Hypothesis", value="", elem_classes="card")
+                        with gr.Column():
+                            plan_md = gr.Markdown(label="Action Plan", value="", elem_classes="card")
+                            esc_md = gr.Markdown(label="When to Escalate", value="", elem_classes="card")
+                    warn_md = gr.Markdown(label="Warnings", value="", elem_classes="card")
 
-                generate_btn = gr.Button("Generate Plan", variant="primary")
+                with gr.Group(elem_classes="panel"):
+                    gr.Markdown("<div class='section-title'>YouTube Helper</div>")
+                    video_html = gr.HTML(value="", elem_id="yt_embed")
+                    with gr.Row():
+                        video_picker = gr.Dropdown(label="Pick a result", choices=[], value=None)
+                        youtube_link = gr.Markdown(visible=True)
+                    videos_state = gr.State(value={"videos": [], "query": ""})
 
-                gr.Markdown("---")
-                gr.Markdown("### Diagnostics (optional)")
-                consent = gr.Checkbox(label="Allow read-only local diagnostics", value=False)
-                redact = gr.Checkbox(label="Redact IPs", value=True)
-                run_diag = gr.Button("Run Diagnostics", interactive=False)
-                diag_summary = gr.Markdown()
-
-                # enable/disable diagnostics button based on consent
-                def _toggle(cons):
-                    return gr.update(interactive=bool(cons))
-                consent.change(_toggle, inputs=[consent], outputs=[run_diag])
-
-                def _run_diagnostics(redact_ips: bool):
-                    results = diag.collect(redact_ips)
-                    summary = diag.summarize(results)
-                    # Build readable markdown
-                    def _sect(name):
-                        items = summary.get(name, [])
-                        return f"#### {name}\n" + ("\n" + _md_list(items) if items else "\n- No data")
-                    md = "\n\n".join([_sect("Network"), _sect("Storage"), _sect("Performance"), _sect("Connectivity")])
-                    return md
-                run_diag.click(_run_diagnostics, inputs=[redact], outputs=[diag_summary])
-
-            with gr.Column(scale=2):
-                gr.Markdown("### YouTube Helper")
-                video_html = gr.HTML(value="", elem_id="yt_embed")
-                with gr.Row():
-                    choose_v2 = gr.Button("Use Video #2")
-                    choose_v3 = gr.Button("Use Video #3")
-                youtube_link = gr.Markdown(visible=True)
-                videos_state = gr.State(value={"videos": [], "query": ""})
-
-                def _change_video(idx: int, state: dict):
-                    vids = state.get("videos", [])
-                    if 0 <= idx < len(vids):
-                        v = vids[idx]
-                        html = _iframe_html(v.get("videoId", ""), v.get("title", "Tutorial"))
-                        return html
-                    return gr.update()
-                choose_v2.click(_change_video, inputs=[gr.Number(value=1, visible=False), videos_state], outputs=[video_html])
-                choose_v3.click(_change_video, inputs=[gr.Number(value=2, visible=False), videos_state], outputs=[video_html])
-
-        gr.Markdown("---")
-        gr.Markdown("### Step 3 — Auto Output", elem_id="auto-output")
+        # Tools row: Diagnostics
         with gr.Row():
-            with gr.Column():
-                obs_md = gr.Markdown(label="Observations", value="")
-                hyp_md = gr.Markdown(label="Hypothesis", value="")
-            with gr.Column():
-                plan_md = gr.Markdown(label="Action Plan", value="")
-                esc_md = gr.Markdown(label="When to Escalate", value="")
-        warn_md = gr.Markdown(label="Warnings", value="")
+            with gr.Column(scale=2):
+                with gr.Group(elem_classes="panel"):
+                    gr.Markdown("<div class='section-title'>Diagnostics (optional)</div>")
+                    consent = gr.Checkbox(label="Allow read-only local diagnostics", value=False)
+                    redact = gr.Checkbox(label="Redact IPs", value=True)
+                    run_diag = gr.Button("Run Diagnostics", interactive=False)
+                    diag_summary = gr.Markdown(elem_classes="card")
 
-        # Generate callback
-        def _generate(product_type, brand, model, issue_summary, details, temperature, model_name):
-            # Validate required
-            missing = []
-            if not product_type:
-                missing.append("Product Type")
-            if not brand:
-                missing.append("Brand")
-            if not model:
-                missing.append("Model")
-            if not issue_summary:
-                missing.append("Issue summary")
-            if missing:
-                msg = "Please complete required fields: " + ", ".join(missing)
-                return (
-                    "-",  # obs
-                    f"⚠️ {msg}",
-                    "", "", "",
-                    gr.update(), gr.update(),  # video html and link
-                    {"videos": [], "query": ""},
-                )
+                    def _toggle(cons):
+                        return gr.update(interactive=bool(cons))
+                    consent.change(_toggle, inputs=[consent], outputs=[run_diag])
 
-            if service is None:
-                return (
-                    "-",
-                    "⚠️ OpenAI API key not configured.",
-                    "", "", "",
-                    gr.update(), gr.update(), {"videos": [], "query": ""}
-                )
+                    def _run_diagnostics(redact_ips: bool):
+                        results = diag.collect(redact_ips)
+                        summary = diag.summarize(results)
+                        def _sect(name):
+                            items = summary.get(name, [])
+                            return f"#### {name}\n" + ("\n" + _md_list(items) if items else "\n- No data")
+                        md = "\n\n".join([_sect("Network"), _sect("Storage"), _sect("Performance"), _sect("Connectivity")])
+                        return md
+                    run_diag.click(_run_diagnostics, inputs=[redact], outputs=[diag_summary])
 
-            # Generate LLM plan
-            ts, raw = generate_troubleshoot_result(
-                service,
-                product_type, brand, model,
-                issue_summary, details,
-                model_name=model_name, reasoning_effort=_map_temp_to_effort(float(temperature))
+    # Generate callback
+    def _generate(product_type, brand, model, issue_summary, details, temperature, model_name):
+        # Validate required
+        missing = []
+        if not product_type:
+            missing.append("Product Type")
+        if not brand:
+            missing.append("Brand")
+        if not model:
+            missing.append("Model")
+        if not issue_summary:
+            missing.append("Issue summary")
+        if missing:
+            msg = "Please complete required fields: " + ", ".join(missing)
+            return (
+                "-",  # obs
+                f"⚠️ {msg}",
+                "", "", "",
+                gr.update(), gr.update(),  # video html and link
+                [], None,  # picker choices, picker value
+                {"videos": [], "query": ""},
             )
 
-            # Render outputs
-            obs = _md_list(ts.observations)
-            hyp = ts.hypothesis
-            plan = _md_list(ts.actionPlan, numbered=True)
-            esc = _md_list(ts.escalationCriteria)
-            warn = _md_list(ts.warnings or [])
+        if service is None:
+            return (
+                "-",
+                "⚠️ OpenAI API key not configured.",
+                "", "", "",
+                gr.update(), gr.update(), [], None, {"videos": [], "query": ""}
+            )
 
-            # YouTube helper
-            yt = search_youtube(ts.productType, ts.brand, ts.model, ts.suggestedKeywords)
-            vids = yt.get("videos", [])
-            first = vids[0] if vids else {"videoId": "dQw4w9WgXcQ", "title": "Tutorial"}
-            html = _iframe_html(first.get("videoId", ""), first.get("title", "Tutorial"))
-            q = yt.get("query", "")
-            link_md = f"Open full results on YouTube: [link](https://www.youtube.com/results?search_query={q.replace(' ', '+')})"
-            state = {"videos": vids, "query": q}
+        # Generate LLM plan
+        ts, raw = generate_troubleshoot_result(
+            service,
+            product_type, brand, model,
+            issue_summary, details,
+            model_name=model_name, reasoning_effort=_map_temp_to_effort(float(temperature))
+        )
 
-            return obs, hyp, plan, esc, warn, html, link_md, state
+        # Render outputs
+        obs = _md_list(ts.observations)
+        hyp = ts.hypothesis
+        plan = _md_list(ts.actionPlan, numbered=True)
+        esc = _md_list(ts.escalationCriteria)
+        warn = _md_list(ts.warnings or [])
 
+        # YouTube helper
+        yt = search_youtube(ts.productType, ts.brand, ts.model, ts.suggestedKeywords)
+        vids = yt.get("videos", [])
+        first = vids[0] if vids else {"videoId": "xQZ8dS2o3kI", "title": "Tutorial"}
+        html = _iframe_html(first.get("videoId", ""), first.get("title", "Tutorial"))
+        q = yt.get("query", "")
+        link_md = f"Open full results on YouTube: [link](https://www.youtube.com/results?search_query={q.replace(' ', '+')})"
+        state = {"videos": vids, "query": q}
+
+        picker_choices = [v.get("title", f"Video {i+1}") for i, v in enumerate(vids)]
+        picker_value = picker_choices[0] if picker_choices else None
+
+        return (
+            obs, hyp, plan, esc, warn,
+            html, link_md,
+            picker_choices, picker_value,
+            state
+        )
+        # Wire events
         generate_btn.click(
             _generate,
             inputs=[product_type, brand, model, issue_summary, details, temp, model_name],
-            outputs=[obs_md, hyp_md, plan_md, esc_md, warn_md, video_html, youtube_link, videos_state]
+            outputs=[
+                obs_md, hyp_md, plan_md, esc_md, warn_md,
+                video_html, youtube_link,
+                video_picker, video_picker,  # update choices and value
+                videos_state,
+            ]
         )
+
+        issue_summary.submit(
+            _generate,
+            inputs=[product_type, brand, model, issue_summary, details, temp, model_name],
+            outputs=[
+                obs_md, hyp_md, plan_md, esc_md, warn_md,
+                video_html, youtube_link,
+                video_picker, video_picker,
+                videos_state,
+            ]
+        )
+
+        def _pick_video(title: str, state: dict):
+            vids = state.get("videos", [])
+            for v in vids:
+                if v.get("title") == title:
+                    return _iframe_html(v.get("videoId", ""), v.get("title", "Tutorial"))
+            return gr.update()
+
+        video_picker.change(_pick_video, inputs=[video_picker, videos_state], outputs=[video_html])
 
         gr.Markdown("Built by Marwa Monsour", elem_classes="footer")
 
