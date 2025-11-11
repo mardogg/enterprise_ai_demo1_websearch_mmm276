@@ -228,9 +228,9 @@ def main() -> int:
         if args.verbose:
             print("Searching...\n")  # pragma: no cover
 
-        log_q = args.query if args.mode == "default" else f"[{args.mode}] {args.query}"  # pragma: no cover
-        logger.info(f"Executing search query: '{log_q}'")
-        with LogContext(logger, "Web search", query=log_q, model=args.model):
+        log_query_display = args.query if args.mode == "default" else f"[{args.mode}] {args.query}"
+        logger.info("Executing search query: '%s'" % log_query_display)
+        with LogContext(logger, "Web search", query=log_query_display, model=args.model):
             result = service.search(prompt, options)
         
         logger.info(f"Search completed: {len(result.citations)} citations found")
