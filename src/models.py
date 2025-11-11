@@ -27,6 +27,7 @@ LEARNING OBJECTIVES:
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 
 # ============================================================================
@@ -404,3 +405,28 @@ class SearchError(Exception):
         if self.details:
             error_str += f" | Details: {self.details}"
         return error_str
+
+
+# ============================================================================
+# BLUEPRINT 6: TroubleshootResult - Structured Troubleshooting Contract
+# ============================================================================
+
+class TroubleshootResult(BaseModel):
+    """
+    Contract for structured troubleshooting output produced by the LLM.
+
+    Matches the requested schema exactly and is validated with Pydantic.
+    """
+
+    productType: str
+    brand: str
+    model: str
+    issueSummary: str
+    observations: List[str] = Field(default_factory=list)
+    hypothesis: str
+    probableCauses: Optional[List[str]] = None
+    actionPlan: List[str] = Field(default_factory=list)
+    escalationCriteria: List[str] = Field(default_factory=list)
+    warnings: Optional[List[str]] = None
+    suggestedKeywords: List[str] = Field(default_factory=list)
+
