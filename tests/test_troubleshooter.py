@@ -51,3 +51,17 @@ def test_generate_troubleshoot_result_fallback():
     assert isinstance(result, TroubleshootResult)
     assert "Insufficient details" in result.hypothesis
     assert "reboots" in result.suggestedKeywords[0].lower() or len(result.suggestedKeywords) > 0
+
+
+@pytest.mark.unit
+def test_generate_troubleshoot_result_with_fences():
+    # Ensure code fence stripping branch executes
+    json_body = '{"productType":"Printer","brand":"HP","model":"LaserJet","issueSummary":"Paper jams","observations":["Frequent jams"],"hypothesis":"Rollers worn","actionPlan":["Clean rollers"],"escalationCriteria":["Visible damage"],"suggestedKeywords":["HP","LaserJet","paper jam","fix"]}'
+    fenced = "```json\n" + json_body + "\n```"
+    svc = _StubService(fenced)
+    result, raw = generate_troubleshoot_result(
+        svc,
+        "Printer", "HP", "LaserJet", "Paper jams", "details", None, "low"
+    )
+    assert result.productType == "Printer"
+    assert result.hypothesis  # parsed correctly

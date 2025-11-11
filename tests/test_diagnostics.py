@@ -46,3 +46,17 @@ def test_summarize(monkeypatch):
     assert summary["Connectivity"]
     assert summary["Storage"]
     assert summary["Performance"]
+
+
+@pytest.mark.unit
+def test_collect_mac_and_linux(monkeypatch):
+    # macOS branch
+    monkeypatch.setattr(dx.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(dx, "run_command", lambda cmd: "ok")
+    out_mac = dx.collect()
+    assert all(label in out_mac for label, _ in dx.MAC_CMDS)
+
+    # linux branch
+    monkeypatch.setattr(dx.platform, "system", lambda: "Linux")
+    out_lin = dx.collect()
+    assert all(label in out_lin for label, _ in dx.LINUX_CMDS)

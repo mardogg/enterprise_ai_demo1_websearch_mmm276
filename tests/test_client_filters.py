@@ -21,8 +21,11 @@ def test_search_filters_retry_removes_filters(mock_openai_class, test_api_key):
         output = []
 
     # Side effects: raise then return dummy
+    class _Resp:  # minimal object with .request to satisfy BadRequestError constructor
+        request = object()
+
     mock_client_instance.responses.create.side_effect = [
-        BadRequestError("Parameter 'filters' not supported", response=None, body=None),
+        BadRequestError("Parameter 'filters' not supported", response=_Resp(), body=None),
         _DummyResponse(),
     ]
     mock_openai_class.return_value = mock_client_instance

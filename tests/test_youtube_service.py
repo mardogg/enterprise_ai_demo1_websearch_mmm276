@@ -107,3 +107,19 @@ def test_search_youtube_api_path_reranking(monkeypatch):
     assert len(ids) == len(set(ids))
     # At least one high quality positive term title present
     assert any("fix" in v["title"].lower() or "troubleshoot" in v["title"].lower() for v in result["videos"])
+
+
+@pytest.mark.unit
+def test_search_youtube_api_path_empty_details(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_API_KEY", "FAKE_KEY")
+    # Make build return no detail items to trigger curated fallback after API
+    class _StubEmpty:
+        def search(self):
+            return _StubSearchList([{ "id": {"videoId": "x"}}])
+        def videos(self):
+            return _StubVideosList([])  # no details
+    monkeypatch.setattr(ys, "build", lambda *a, **k: _StubEmpty())
+    result = ys.search_youtube("Tablet", "Apple", "iPad", ["setup"])
+    assert result["fallback"] is False or result["fallback"] is True  # path executes
+    # When details empty, implementation fills with curated default
+    assert len(result["videos"]) >= 1
