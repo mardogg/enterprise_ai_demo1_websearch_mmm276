@@ -205,13 +205,15 @@ function formatPlanText(plan: Plan): string {
 export default function AITechAssistant() {
   // Form state
   const [productType, setProductType] = useState("");
+  const [customType, setCustomType] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [issue, setIssue] = useState("");
   const [details, setDetails] = useState("");
 
   // Derived
-  const canGenerate = useMemo(() => [productType, brand, model, issue].every(Boolean), [productType, brand, model, issue]);
+  const effectiveType = useMemo(() => (productType === "Other" ? (customType || "Other") : productType), [productType, customType]);
+  const canGenerate = useMemo(() => [effectiveType, brand, model, issue].every(Boolean), [effectiveType, brand, model, issue]);
 
   // Plan state
   const [loading, setLoading] = useState(false);
@@ -224,6 +226,9 @@ export default function AITechAssistant() {
 
   // Diagnostics
   const [consent, setConsent] = useState(false);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagError, setDiagError] = useState<string | null>(null);
+  const [diagSummary, setDiagSummary] = useState<string | null>(null);
 
   // Auto-generate when the required fields are filled
   useEffect(() => {
@@ -232,11 +237,11 @@ export default function AITechAssistant() {
       if (!canGenerate) return;
       setLoading(true);
       try {
-        const p = await generatePlan({ productType, brand, model, issue, details });
+  const p = await generatePlan({ productType: effectiveType, brand, model, issue, details });
         if (abort) return;
         setPlan(p);
         // observations checkbox state must be preserved as objects; keep as-is from p
-        const query = `${productType} ${brand} ${model} ${issue} fix troubleshoot`;
+  const query = `${effectiveType} ${brand} ${model} ${issue} fix troubleshoot`;
         const yt = await searchYoutube(query);
         if (abort) return;
         setVideos(yt.videos);
@@ -262,7 +267,24 @@ export default function AITechAssistant() {
 
   async function copyPlan() {
     if (!plan) return;
-    await navigator.clipboard.writeText(formatPlanText(plan));
+    const obs = plan.observations
+      .map((o) => `- [${o.checked ? "x" : " "}] ${o.text}`)
+      .join("\n");
+    const act = plan.actionPlan.map((s, i) => `${i + 1}. ${s}`).join("\n");
+    const esc = plan.escalationCriteria.map((s) => `- ${s}`).join("\n");
+    const warn = (plan.warnings || []).map((s) => `- ${s}`).join("\n");
+    const text = [
+      `## Observations`,
+      obs,
+      `\n## Hypothesis`,
+      plan.hypothesis,
+      `\n## Action Plan`,
+      act,
+      `\n## When to Escalate`,
+      esc,
+      warn ? `\n## Warnings\n${warn}` : "",
+    ].join("\n");
+    await navigator.clipboard.writeText(text);
     setCopyMsg("Plan copied");
     setTimeout(() => setCopyMsg(""), 2000);
   }
@@ -278,6 +300,9 @@ export default function AITechAssistant() {
     setCurrentVideoId(undefined);
     setCopyMsg("");
     setConsent(false);
+    setDiagLoading(false);
+    setDiagError(null);
+    setDiagSummary(null);
   }
 
   const planActions = (
@@ -326,6 +351,11 @@ export default function AITechAssistant() {
                     ))}
                   </Select>
                 </Labeled>
+                {productType === "Other" && (
+                  <Labeled id="customType" label="Specify type" hint="Describe your device type">
+                    <Input id="customType" placeholder="e.g., VR headset, NAS, Smart speaker" value={customType} onChange={(e) => setCustomType(e.target.value)} />
+                  </Labeled>
+                )}
                 <Labeled id="brand" label="Brand" hint="Required">
                   <Input id="brand" placeholder="Dell, Apple, Netgear…" value={brand} onChange={(e) => setBrand(e.target.value)} />
                 </Labeled>
@@ -358,19 +388,64 @@ export default function AITechAssistant() {
                   />
                   Allow read-only demo diagnostics
                 </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!consent || diagLoading}
+                    onClick={async () => {
+                      setDiagError(null);
+                      setDiagSummary(null);
+                      if (!consent) return;
+                      setDiagLoading(true);
+                      try {
+                        // Simulate latency and potential error
+                        await new Promise((r) => setTimeout(r, 600));
+                        // 1-in-12 chance to show an error demo
+                        if (Math.random() < 1/12) {
+                          throw new Error("Temporary diagnostics service issue. Try again.");
+                        }
+                        setDiagSummary(
+                          [
+                            "Network: Adapter detected, DNS reachable, ping stable.",
+                            "Storage: Free space 48%, SMART OK.",
+                            "Performance: CPU normal, no thermal throttling.",
+                            "Connectivity: Gateway reachable, HTTPS handshake OK.",
+                          ].join("\n")
+                        );
+                      } catch (e: any) {
+                        setDiagError(e?.message || "Unexpected error running diagnostics.");
+                      } finally {
+                        setDiagLoading(false);
+                      }
+                    }}
+                    className={[
+                      "inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium",
+                      !consent || diagLoading ? "bg-white/10 text-white/50" : "bg-white/10 text-white hover:bg-white/20",
+                    ].join(" ")}
+                    aria-disabled={!consent || diagLoading}
+                  >
+                    {diagLoading ? "Running…" : "Run Diagnostics"}
+                  </button>
+                </div>
                 <div
                   className="rounded-xl bg-white/5 p-3 text-sm text-slate-300 ring-1 ring-inset ring-white/10"
                   aria-live="polite"
                 >
-                  {consent ? (
+                  {!consent && (
+                    <span className="text-slate-400">Diagnostics are disabled. Check the box, then click Run Diagnostics.</span>
+                  )}
+                  {consent && !diagLoading && !diagError && diagSummary && (
                     <ul className="list-disc space-y-1 pl-5">
-                      <li>Network: Adapter detected, DNS reachable, ping stable.</li>
-                      <li>Storage: Free space: 48%, SMART: OK.</li>
-                      <li>Performance: CPU normal, no thermal throttling observed.</li>
-                      <li>Connectivity: Gateway reachable, HTTPS handshake OK.</li>
+                      {diagSummary.split("\n").map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
                     </ul>
-                  ) : (
-                    <span className="text-slate-400">Diagnostics are disabled. Check the box to view a read-only demo summary.</span>
+                  )}
+                  {consent && diagLoading && (
+                    <span className="text-slate-400">Collecting system info…</span>
+                  )}
+                  {consent && !diagLoading && diagError && (
+                    <div className="rounded-lg bg-rose-500/10 p-2 text-rose-200 ring-1 ring-inset ring-rose-500/20">{diagError}</div>
                   )}
                 </div>
               </div>
@@ -472,7 +547,7 @@ export default function AITechAssistant() {
                     ))}
                     {plan && (
                       <a
-                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${productType} ${brand} ${model} ${issue} fix troubleshoot`)}`}
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${effectiveType} ${brand} ${model} ${issue} fix troubleshoot`)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/20"
