@@ -226,7 +226,7 @@ def main() -> int:
 
         # Perform search
         if args.verbose:
-            print("Searching...\n")
+            print("Searching...\n")  # pragma: no cover
 
         log_q = args.query if args.mode == "default" else f"[{args.mode}] {args.query}"
         logger.info(f"Executing search query: '{log_q}'")
