@@ -9,29 +9,40 @@ from .models import TroubleshootResult, SearchError, SearchOptions
 def _build_prompt(product_type: str, brand: str, model: str, issue_summary: str, advanced_details: str) -> str:
     contract = textwrap.dedent(
         """
-        You are a senior device repair technician. Produce a strictly valid JSON object matching this TypeScript type:
+        You are a senior device repair technician with extensive experience. 
+        
+        IMPORTANT: Carefully analyze ALL the information provided below. Take your time to:
+        1. Read and understand the product type, brand, model
+        2. Thoroughly analyze the issue summary and all advanced details
+        3. Consider the specific device characteristics and common failure modes
+        4. Research known issues for this specific device model if applicable
+        5. Generate a comprehensive, device-specific troubleshooting plan
+        
+        Produce a strictly valid JSON object matching this TypeScript type:
 
         type TroubleshootResult = {
           productType: string;
           brand: string;
           model: string;
           issueSummary: string;
-          observations: string[];        // confirmable checks
-          hypothesis: string;            // concise, testable cause
-          probableCauses?: string[];     // optional, ordered
-          actionPlan: string[];          // safe-first, numbered steps
-          escalationCriteria: string[];  // concrete stop/seek-help triggers
-          warnings?: string[];           // safety/warranty/data-loss
-          suggestedKeywords: string[];   // for YouTube query enrichment
+          observations: string[];        // detailed, confirmable checks specific to THIS device
+          hypothesis: string;            // detailed, testable cause based on the PROVIDED information
+          probableCauses?: string[];     // ordered by likelihood based on the symptoms described
+          actionPlan: string[];          // comprehensive, safe-first, numbered steps tailored to THIS issue
+          escalationCriteria: string[];  // concrete stop/seek-help triggers relevant to this specific problem
+          warnings?: string[];           // safety/warranty/data-loss warnings relevant to this device/issue
+          suggestedKeywords: string[];   // specific search terms for THIS device and issue
         };
 
         Rules:
         - Output JSON only, no markdown, no prose, no code fences.
-        - Keep hypothesis to 1–2 sentences.
-        - Action plan must start with safe, non-destructive steps.
-        - Use short, checkable observations (LED codes, messages, noises).
-        - Provide concrete escalation criteria (battery swelling, thermal >95C, clicking drive, no POST, warranty issues, liquid damage, repeated shutdowns).
-        - suggestedKeywords should be compact search terms to find tutorials.
+        - ANALYZE the provided details carefully - don't give generic advice
+        - Observations should reference the ACTUAL symptoms and details provided
+        - Hypothesis should explain the SPECIFIC issue described, not generic problems
+        - Action plan should be tailored to the EXACT device and problem described
+        - Include device-specific commands, settings, or procedures when applicable
+        - Escalation criteria should be specific to the described symptoms
+        - suggestedKeywords should include the ACTUAL brand, model, and specific issue terms
         """
     ).strip()
 
@@ -43,7 +54,7 @@ def _build_prompt(product_type: str, brand: str, model: str, issue_summary: str,
         "advancedDetails": advanced_details or "",
     }
 
-    return contract + "\n\n" + json.dumps(context)
+    return contract + "\n\nUser Input to Analyze:\n" + json.dumps(context, indent=2)
 
 
 def generate_troubleshoot_result(

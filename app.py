@@ -1,13 +1,8 @@
-"""
-Gradio-based chat UI for the AI Tech Assistant
+"""Deprecated legacy Gradio UI file. Intentionally left blank after migration to React frontend."""
 
-Run with:
-    python app.py
-
-This UI uses the existing SearchService in src/search_service.py.
-"""
-
+# Prevent accidental execution; use the React app in web/ instead.
 import os
+raise SystemExit("Gradio UI has been removed. Please run the React app in the 'web' folder (npm run dev).")
 import textwrap
 import traceback
 from dotenv import load_dotenv

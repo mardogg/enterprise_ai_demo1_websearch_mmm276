@@ -1,5 +1,5 @@
 import React from 'react';
-import AITechAssistant from '../../src/AITechAssistant';
+import AITechAssistant from './components/AITechAssistant';
 
 export default function App() {
   return <AITechAssistant />;

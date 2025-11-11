@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.github/
+.gitignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Misc
+.pylintrc
+pytest.ini
+.coveragerc
+gradio_share_url.txt
+plan.md
+STUDENT_CRITIQUE.md

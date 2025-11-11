@@ -32,3 +32,5 @@ def test_troubleshooter_fallback_minimal_missing_arrays():
     )
     assert isinstance(result, TroubleshootResult)
     assert 'Insufficient details' in result.hypothesis
+    # Ensure fallback added expected default observation
+    assert any('symptoms' in obs.lower() for obs in result.observations)
