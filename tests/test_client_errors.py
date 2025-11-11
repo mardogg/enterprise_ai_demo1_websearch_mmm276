@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from openai import BadRequestError
 
 from src.client import WebSearchClient
+from src.models import SearchError
 
 
 @pytest.mark.unit
@@ -23,7 +24,7 @@ def test_search_badrequest_no_filters_maps_to_api_error(mock_openai_class, test_
     mock_openai_class.return_value = mock_client_instance
 
     client = WebSearchClient(api_key=test_api_key)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SearchError) as exc:
         client.search("query")
     # Should raise our SearchError wrapper with API_ERROR code in message
-    assert "API request failed" in str(exc.value)
+    assert exc.value.code == "API_ERROR"
