@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { generatePlan as genPlan, TroubleshootResult } from "./generatePlan";
+import { searchYoutube as ytSearch, YTItem } from "./youtube";
 
 // ---- Small UI helpers (Tailwind-only) ----
 export function Card({ className = "", children, title, actions }: {
@@ -122,55 +124,7 @@ export type Plan = {
 };
 
 // ---- Stubs (replace with API calls) ----
-export async function generatePlan(params: {
-  productType: string;
-  brand: string;
-  model: string;
-  issue: string;
-  details?: string;
-}): Promise<Plan> {
-  const { productType, brand, model, issue, details } = params;
-  // Fake delay
-  await new Promise((r) => setTimeout(r, 350));
-  const prefix = `${brand} ${model}`.trim();
-  return {
-    observations: [
-      { text: `${prefix}: issue described as "${issue}"`, checked: false },
-      { text: `Device type: ${productType}`, checked: false },
-      { text: details ? `Extra details provided` : `No extra details provided`, checked: false },
-    ],
-    hypothesis: `Most likely a configuration or driver issue given the symptoms ("${issue}").`,
-    actionPlan: [
-      `Reproduce the issue and capture exact error messages (if any).`,
-      `Check power/network indicators; verify cables or wireless strength.`,
-      `Update drivers/firmware; install pending OS updates.`,
-      `Test in Safe Mode or with a clean profile to isolate software conflicts.`,
-    ],
-    escalationCriteria: [
-      `Hardware indicators (beeps/LED codes) suggesting component failure`,
-      `Crash-dumps pointing to persistent kernel faults`,
-      `No improvement after clean boot and driver rollbacks`,
-    ],
-    warnings: [
-      `Back up important files before changes that could affect data.`,
-      `Avoid opening the device if under warranty; follow ESD precautions.`,
-    ],
-  };
-}
-
-export async function searchYoutube(query: string): Promise<{
-  videos: { id: string; title: string }[];
-}> {
-  // Simulated relevance-ranked results (replace with your backend call)
-  await new Promise((r) => setTimeout(r, 200));
-  return {
-    videos: [
-      { id: "Qp7R8s1V2xY", title: `Best fix guide for ${query}` },
-      { id: "xQZ8dS2o3kI", title: `Troubleshooting steps for ${query}` },
-      { id: "Hk9L2d3S4mN", title: `How to repair ${query}` },
-    ],
-  };
-}
+// remove local stubs; use external modules for plan and YouTube search
 
 // ---- Main component ----
 const productTypes = [
@@ -221,7 +175,7 @@ export default function AITechAssistant() {
   const [copyMsg, setCopyMsg] = useState<string>("");
 
   // YouTube state
-  const [videos, setVideos] = useState<{ id: string; title: string }[]>([]);
+  const [videos, setVideos] = useState<YTItem[]>([]);
   const [currentVideoId, setCurrentVideoId] = useState<string | undefined>(undefined);
 
   // Diagnostics
@@ -237,15 +191,23 @@ export default function AITechAssistant() {
       if (!canGenerate) return;
       setLoading(true);
       try {
-  const p = await generatePlan({ productType: effectiveType, brand, model, issue, details });
+        const r: TroubleshootResult = await genPlan(effectiveType, brand, model, issue, details);
         if (abort) return;
+        const p: Plan = {
+          observations: r.observations.map((t) => ({ text: t, checked: false })),
+          hypothesis: r.hypothesis,
+          actionPlan: r.actionPlan,
+          escalationCriteria: r.escalationCriteria,
+          warnings: r.warnings,
+        };
         setPlan(p);
         // observations checkbox state must be preserved as objects; keep as-is from p
-  const query = `${effectiveType} ${brand} ${model} ${issue} fix troubleshoot`;
-        const yt = await searchYoutube(query);
+        const keywords = (r.suggestedKeywords || []).join(' ');
+        const query = `${effectiveType} ${brand} ${model} ${issue} fix troubleshoot repair ${keywords}`.trim();
+        const yt = await ytSearch(query);
         if (abort) return;
-        setVideos(yt.videos);
-        setCurrentVideoId(yt.videos[0]?.id);
+        setVideos(yt);
+        setCurrentVideoId(yt[0]?.videoId);
       } finally {
         if (!abort) setLoading(false);
       }
@@ -526,17 +488,17 @@ export default function AITechAssistant() {
 
             <Card title="YouTube Helper">
               <div className="space-y-3">
-                <YouTubePlayer videoId={currentVideoId} title={videos.find(v => v.id === currentVideoId)?.title} />
+                <YouTubePlayer videoId={currentVideoId} title={videos.find(v => v.videoId === currentVideoId)?.title} />
                 {videos.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {videos.slice(0, 3).map((v, idx) => (
                       <button
-                        key={v.id}
+                        key={v.videoId}
                         type="button"
-                        onClick={() => setCurrentVideoId(v.id)}
+                        onClick={() => setCurrentVideoId(v.videoId)}
                         className={[
                           "rounded-xl px-3 py-2 text-sm font-medium",
-                          currentVideoId === v.id
+                          currentVideoId === v.videoId
                             ? "bg-emerald-500 text-emerald-950 shadow"
                             : "bg-white/10 text-white hover:bg-white/20",
                         ].join(" ")}
@@ -547,7 +509,7 @@ export default function AITechAssistant() {
                     ))}
                     {plan && (
                       <a
-                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${effectiveType} ${brand} ${model} ${issue} fix troubleshoot`)}`}
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${effectiveType} ${brand} ${model} ${issue} fix troubleshoot repair`)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/20"
