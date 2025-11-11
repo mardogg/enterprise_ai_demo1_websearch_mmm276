@@ -65,3 +65,16 @@ def test_generate_troubleshoot_result_with_fences():
     )
     assert result.productType == "Printer"
     assert result.hypothesis  # parsed correctly
+
+
+@pytest.mark.unit
+def test_generate_troubleshoot_result_with_plain_fence():
+    # Fenced without json tag, still should parse after stripping
+    json_body = '{"productType":"Router/Modem","brand":"TP-Link","model":"AX50","issueSummary":"Drops","observations":["Random drops"],"hypothesis":"Firmware issue","actionPlan":["Update firmware"],"escalationCriteria":["Still drops"],"suggestedKeywords":["TP-Link","AX50","firmware","fix"]}'
+    fenced = "```\n" + json_body + "\n```"
+    svc = _StubService(fenced)
+    result, raw = generate_troubleshoot_result(
+        svc,
+        "Router/Modem", "TP-Link", "AX50", "Drops", "details", None, "low"
+    )
+    assert result.productType == "Router/Modem"

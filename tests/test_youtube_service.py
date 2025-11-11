@@ -71,6 +71,10 @@ class _StubYouTube:
             for i, t in enumerate(titles)
         ]
 
+    # Allow attribute access for type checkers
+    def __getattr__(self, name):  # pragma: no cover - not part of coverage target
+        raise AttributeError(name)
+
     def search(self):
         return _StubSearchList(self._search_items)
 
@@ -120,6 +124,5 @@ def test_search_youtube_api_path_empty_details(monkeypatch):
             return _StubVideosList([])  # no details
     monkeypatch.setattr(ys, "build", lambda *a, **k: _StubEmpty())
     result = ys.search_youtube("Tablet", "Apple", "iPad", ["setup"])
-    assert result["fallback"] is False or result["fallback"] is True  # path executes
     # When details empty, implementation fills with curated default
     assert len(result["videos"]) >= 1
