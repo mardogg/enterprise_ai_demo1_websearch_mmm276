@@ -38,7 +38,7 @@ def test_main_techsupport_mode_enables_curated_domains(mock_service_class, mock_
 @pytest.mark.integration
 @patch('src.main.SearchService')
 @patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'})
-def test_main_saves_output_file(tmp_path, mock_service_class, mock_datetime):
+def test_main_saves_output_file(mock_service_class, mock_datetime, tmp_path):
     mock_service = MagicMock()
     result = SearchResult(
         query="Q",
