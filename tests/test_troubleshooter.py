@@ -54,6 +54,18 @@ def test_generate_troubleshoot_result_fallback():
 
 
 @pytest.mark.unit
+def test_generate_troubleshoot_result_minimum_fields_only():
+    # Provide JSON missing optional arrays to exercise model instantiation path
+    minimal = '{"productType":"Laptop/PC","brand":"Dell","model":"XPS","issueSummary":"Boot loop","observations":["Looping"],"hypothesis":"Pending cause","actionPlan":["Reset"],"escalationCriteria":["Still loops"],"suggestedKeywords":["Dell","boot loop"]}'
+    svc = _StubService(minimal)
+    result, raw = generate_troubleshoot_result(
+        svc,
+        "Laptop/PC", "Dell", "XPS", "Boot loop", "", None, "low"
+    )
+    assert result.issueSummary == "Boot loop"
+
+
+@pytest.mark.unit
 def test_generate_troubleshoot_result_with_fences():
     # Ensure code fence stripping branch executes
     json_body = '{"productType":"Printer","brand":"HP","model":"LaserJet","issueSummary":"Paper jams","observations":["Frequent jams"],"hypothesis":"Rollers worn","actionPlan":["Clean rollers"],"escalationCriteria":["Visible damage"],"suggestedKeywords":["HP","LaserJet","paper jam","fix"]}'

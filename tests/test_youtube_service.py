@@ -126,3 +126,15 @@ def test_search_youtube_api_path_empty_details(monkeypatch):
     result = ys.search_youtube("Tablet", "Apple", "iPad", ["setup"])
     # When details empty, implementation fills with curated default
     assert len(result["videos"]) >= 1
+
+
+@pytest.mark.unit
+def test_search_youtube_exception_fallback(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_API_KEY", "FAKE_KEY")
+    def _boom(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(ys, "build", _boom)
+    result = ys.search_youtube("Game Console", "Sony", "PS5", ["no video"])
+    # Should return curated fallback safely
+    assert result["fallback"] is True
+    assert len(result["videos"]) == 1
